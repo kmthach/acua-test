@@ -207,22 +207,39 @@ const Timeline = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">Timeline</h1>
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-6">
+          Timeline
+        </h1>
         <SearchBar onSearch={setSearchQuery} />
       </div>
 
       <PostForm onPostCreated={handlePostCreated} />
 
       {loading ? (
-        <div className="text-center py-8 text-gray-600">Loading posts...</div>
+        <div className="text-center py-16">
+          <div className="inline-flex items-center gap-3 text-gray-600">
+            <svg className="animate-spin h-6 w-6" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span className="text-lg">Loading posts...</span>
+          </div>
+        </div>
       ) : posts.length === 0 ? (
-        <div className="text-center py-8 text-gray-600">
-          {searchQuery ? 'No posts found' : 'No posts yet. Be the first to post!'}
+        <div className="text-center py-16">
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-12">
+            <svg className="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <p className="text-xl text-gray-600 font-medium">
+              {searchQuery ? 'No posts found' : 'No posts yet. Be the first to post!'}
+            </p>
+          </div>
         </div>
       ) : (
         <>
-          <div className="space-y-4">
+          <div className="space-y-6">
             {posts.map(post => (
               <Post
                 key={post.id}
@@ -243,21 +260,26 @@ const Timeline = () => {
               style={{ minHeight: '200px', height: '200px' }}
             >
               {loadingMore ? (
-                <div>
+                <div className="flex flex-col items-center gap-3">
                   <div className="flex items-center justify-center space-x-2">
-                    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    <div className="w-3 h-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-bounce"></div>
+                    <div className="w-3 h-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                    <div className="w-3 h-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                   </div>
-                  <p className="text-center text-gray-600 text-sm mt-2">Loading more posts...</p>
+                  <p className="text-center text-gray-600 text-sm font-medium">Loading more posts...</p>
                 </div>
               ) : (
                 <div className="h-8 w-full bg-transparent"></div>
               )}
             </div>
           ) : (
-            <div className="py-8 text-center text-gray-500 text-sm">
-              No more posts to load
+            <div className="py-12 text-center">
+              <div className="inline-flex items-center gap-2 text-gray-400 text-sm">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>No more posts to load</span>
+              </div>
             </div>
           )}
         </>
