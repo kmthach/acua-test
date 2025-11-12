@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { body, validationResult } from "express-validator";
@@ -6,6 +6,14 @@ import { get, run } from "../db/database.js";
 import { JWT_SECRET } from "../config/jwt.js";
 
 const router = express.Router();
+
+interface User {
+  id: number;
+  username: string;
+  password: string;
+  full_name: string;
+  role: string;
+}
 
 // Register
 router.post(
@@ -23,7 +31,7 @@ router.post(
       .isIn(["user", "admin"])
       .withMessage("Role must be user or admin"),
   ],
-  async (req, res) => {
+  async (req: Request, res: Response) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -33,7 +41,7 @@ router.post(
       const { username, password, full_name, role } = req.body;
 
       // Check if username exists
-      const existingUser = await get(
+      const existingUser = await get<User>(
         "SELECT id FROM users WHERE username = ?",
         [username]
       );
@@ -57,7 +65,7 @@ router.post(
       res.status(201).json({
         token,
         user: {
-          id: result.id,
+          id: result.id!,
           username,
           full_name,
           role,
@@ -77,7 +85,7 @@ router.post(
     body("username").trim().notEmpty().withMessage("Username is required"),
     body("password").notEmpty().withMessage("Password is required"),
   ],
-  async (req, res) => {
+  async (req: Request, res: Response) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -87,7 +95,7 @@ router.post(
       const { username, password } = req.body;
 
       // Find user
-      const user = await get("SELECT * FROM users WHERE username = ?", [
+      const user = await get<User>("SELECT * FROM users WHERE username = ?", [
         username,
       ]);
       if (!user) {
@@ -121,7 +129,7 @@ router.post(
 );
 
 // Get current user
-router.get("/me", async (req, res) => {
+router.get("/me", async (req: Request, res: Response) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
 
@@ -129,8 +137,8 @@ router.get("/me", async (req, res) => {
       return res.status(401).json({ error: "Authentication required" });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await get(
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: number };
+    const user = await get<Omit<User, "password">>(
       "SELECT id, username, full_name, role FROM users WHERE id = ?",
       [decoded.userId]
     );
@@ -146,3 +154,4 @@ router.get("/me", async (req, res) => {
 });
 
 export default router;
+

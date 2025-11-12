@@ -1,15 +1,33 @@
-import express from "express";
+import express, { Response } from "express";
 import { body, validationResult } from "express-validator";
-import { authenticate } from "../middleware/auth.js";
+import { authenticate, AuthRequest } from "../middleware/auth.js";
 import { query, run, get } from "../db/database.js";
 
 const router = express.Router();
 
+interface Comment {
+  id: number;
+  post_id: number;
+  user_id: number;
+  content: string;
+  deleted: boolean;
+  edited: boolean;
+  edited_by_admin: boolean;
+  created_at: Date;
+  updated_at: Date;
+  username?: string;
+  full_name?: string;
+}
+
+interface Post {
+  id: number;
+}
+
 // Get comments for a post
-router.get("/post/:postId", authenticate, async (req, res) => {
+router.get("/post/:postId", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { postId } = req.params;
-    const isAdminUser = req.user.role === "admin";
+    const isAdminUser = req.user?.role === "admin";
 
     let sql = `
       SELECT c.*, u.username, u.full_name
@@ -24,7 +42,7 @@ router.get("/post/:postId", authenticate, async (req, res) => {
 
     sql += " ORDER BY c.created_at DESC";
 
-    const comments = await query(sql, [postId]);
+    const comments = await query<Comment>(sql, [postId]);
 
     res.json({ comments });
   } catch (error) {
@@ -41,7 +59,7 @@ router.post(
     body("post_id").isInt().withMessage("Post ID is required"),
     body("content").trim().notEmpty().withMessage("Content is required"),
   ],
-  async (req, res) => {
+  async (req: AuthRequest, res: Response) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -51,7 +69,7 @@ router.post(
       const { post_id, content } = req.body;
 
       // Verify post exists
-      const post = await get(
+      const post = await get<Post>(
         "SELECT id FROM posts WHERE id = ? AND deleted = 0",
         [post_id]
       );
@@ -61,17 +79,17 @@ router.post(
 
       const result = await run(
         "INSERT INTO comments (post_id, user_id, content) VALUES (?, ?, ?) RETURNING id",
-        [post_id, req.user.id, content]
+        [post_id, req.user!.id, content]
       );
 
-      const comment = await get(
+      const comment = await get<Comment>(
         `
       SELECT c.*, u.username, u.full_name 
       FROM comments c 
       INNER JOIN users u ON c.user_id = u.id 
       WHERE c.id = ?
     `,
-        [result.id]
+        [result.id!]
       );
 
       res.status(201).json({ comment });
@@ -87,7 +105,7 @@ router.put(
   "/:id",
   authenticate,
   [body("content").trim().notEmpty().withMessage("Content is required")],
-  async (req, res) => {
+  async (req: AuthRequest, res: Response) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -98,14 +116,14 @@ router.put(
       const { content } = req.body;
 
       // Check if comment exists
-      const comment = await get("SELECT * FROM comments WHERE id = ?", [id]);
+      const comment = await get<Comment>("SELECT * FROM comments WHERE id = ?", [id]);
       if (!comment) {
         return res.status(404).json({ error: "Comment not found" });
       }
 
       // Check permissions
-      const isOwner = comment.user_id === req.user.id;
-      const isAdminUser = req.user.role === "admin";
+      const isOwner = comment.user_id === req.user!.id;
+      const isAdminUser = req.user!.role === "admin";
 
       if (!isOwner && !isAdminUser) {
         return res.status(403).json({ error: "Permission denied" });
@@ -118,7 +136,7 @@ router.put(
         [content, editedByAdmin, id]
       );
 
-      const updatedComment = await get(
+      const updatedComment = await get<Comment>(
         `
       SELECT c.*, u.username, u.full_name 
       FROM comments c 
@@ -137,19 +155,19 @@ router.put(
 );
 
 // Delete comment
-router.delete("/:id", authenticate, async (req, res) => {
+router.delete("/:id", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
     // Check if comment exists
-    const comment = await get("SELECT * FROM comments WHERE id = ?", [id]);
+    const comment = await get<Comment>("SELECT * FROM comments WHERE id = ?", [id]);
     if (!comment) {
       return res.status(404).json({ error: "Comment not found" });
     }
 
     // Check permissions
-    const isOwner = comment.user_id === req.user.id;
-    const isAdminUser = req.user.role === "admin";
+    const isOwner = comment.user_id === req.user!.id;
+    const isAdminUser = req.user!.role === "admin";
 
     if (!isOwner && !isAdminUser) {
       return res.status(403).json({ error: "Permission denied" });
@@ -166,3 +184,4 @@ router.delete("/:id", authenticate, async (req, res) => {
 });
 
 export default router;
+

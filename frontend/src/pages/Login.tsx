@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import axios from "axios";
 
 const Login = () => {
   const [username, setUsername] = useState("");
@@ -10,7 +11,7 @@ const Login = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -19,7 +20,11 @@ const Login = () => {
       await login(username, password);
       navigate("/timeline");
     } catch (err) {
-      setError(err.response?.data?.error || "Login failed");
+      if (axios.isAxiosError(err)) {
+        setError(err.response?.data?.error || "Login failed");
+      } else {
+        setError("Login failed");
+      }
     } finally {
       setLoading(false);
     }
@@ -86,3 +91,4 @@ const Login = () => {
 };
 
 export default Login;
+

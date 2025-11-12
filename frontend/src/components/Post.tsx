@@ -1,15 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
 import CommentSection from './CommentSection';
+import { Post as PostType } from '../types';
+import { User } from '../context/AuthContext';
 
-const Post = ({ post, currentUser, isAdmin, onPostUpdated, onPostDeleted }) => {
+interface PostProps {
+  post: PostType;
+  currentUser: User;
+  isAdmin: boolean;
+  onPostUpdated: (post: PostType) => void;
+  onPostDeleted: (postId: number) => void;
+}
+
+const Post = ({ post, currentUser, isAdmin, onPostUpdated, onPostDeleted }: PostProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(post.content);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showComments, setShowComments] = useState(false);
 
-  const getInitials = (fullName) => {
+  const getInitials = (fullName?: string): string => {
     if (!fullName) return 'U';
     return fullName
       .split(' ')
@@ -27,13 +37,17 @@ const Post = ({ post, currentUser, isAdmin, onPostUpdated, onPostDeleted }) => {
 
     setLoading(true);
     try {
-      const response = await axios.put(`/api/posts/${post.id}`, {
+      const response = await axios.put<{ post: PostType }>(`/api/posts/${post.id}`, {
         content: editContent
       });
       onPostUpdated(response.data.post);
       setIsEditing(false);
     } catch (error) {
-      alert(error.response?.data?.error || 'Failed to update post');
+      if (axios.isAxiosError(error)) {
+        alert(error.response?.data?.error || 'Failed to update post');
+      } else {
+        alert('Failed to update post');
+      }
     } finally {
       setLoading(false);
     }
@@ -49,12 +63,16 @@ const Post = ({ post, currentUser, isAdmin, onPostUpdated, onPostDeleted }) => {
       await axios.delete(`/api/posts/${post.id}`);
       onPostDeleted(post.id);
     } catch (error) {
-      alert(error.response?.data?.error || 'Failed to delete post');
+      if (axios.isAxiosError(error)) {
+        alert(error.response?.data?.error || 'Failed to delete post');
+      } else {
+        alert('Failed to delete post');
+      }
       setDeleting(false);
     }
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleString();
   };
 

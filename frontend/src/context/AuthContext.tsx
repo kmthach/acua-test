@@ -1,7 +1,24 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios';
 
-const AuthContext = createContext();
+export interface User {
+  id: number;
+  username: string;
+  full_name: string;
+  role: string;
+}
+
+interface AuthContextType {
+  user: User | null;
+  loading: boolean;
+  login: (username: string, password: string) => Promise<User>;
+  register: (username: string, password: string, full_name: string, role: string) => Promise<User>;
+  logout: () => void;
+  updateProfile: (full_name: string) => Promise<User>;
+  isAdmin: boolean;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -11,8 +28,12 @@ export const useAuth = () => {
   return context;
 };
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider = ({ children }: AuthProviderProps) => {
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,7 +48,7 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUser = async () => {
     try {
-      const response = await axios.get('/api/auth/me');
+      const response = await axios.get<{ user: User }>('/api/auth/me');
       setUser(response.data.user);
     } catch (error) {
       localStorage.removeItem('token');
@@ -37,8 +58,8 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (username, password) => {
-    const response = await axios.post('/api/auth/login', { username, password });
+  const login = async (username: string, password: string): Promise<User> => {
+    const response = await axios.post<{ token: string; user: User }>('/api/auth/login', { username, password });
     const { token, user } = response.data;
     localStorage.setItem('token', token);
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
@@ -46,8 +67,8 @@ export const AuthProvider = ({ children }) => {
     return user;
   };
 
-  const register = async (username, password, full_name, role) => {
-    const response = await axios.post('/api/auth/register', {
+  const register = async (username: string, password: string, full_name: string, role: string): Promise<User> => {
+    const response = await axios.post<{ token: string; user: User }>('/api/auth/register', {
       username,
       password,
       full_name,
@@ -66,8 +87,8 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
-  const updateProfile = async (full_name) => {
-    const response = await axios.put('/api/users/profile', { full_name });
+  const updateProfile = async (full_name: string): Promise<User> => {
+    const response = await axios.put<{ user: User }>('/api/users/profile', { full_name });
     setUser(response.data.user);
     return response.data.user;
   };

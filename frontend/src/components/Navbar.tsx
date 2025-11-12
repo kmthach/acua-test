@@ -10,7 +10,7 @@ const Navbar = () => {
     navigate('/');
   };
 
-  const getInitials = (fullName) => {
+  const getInitials = (fullName: string): string => {
     if (!fullName) return 'U';
     return fullName
       .split(' ')

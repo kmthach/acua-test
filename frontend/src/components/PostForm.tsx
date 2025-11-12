@@ -1,12 +1,17 @@
-import { useState } from 'react';
+import { useState, FormEvent } from 'react';
 import axios from 'axios';
+import { Post } from '../types';
 
-const PostForm = ({ onPostCreated }) => {
+interface PostFormProps {
+  onPostCreated: (post: Post) => void;
+}
+
+const PostForm = ({ onPostCreated }: PostFormProps) => {
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!content.trim()) return;
 
@@ -14,11 +19,15 @@ const PostForm = ({ onPostCreated }) => {
     setError('');
 
     try {
-      const response = await axios.post('/api/posts', { content });
+      const response = await axios.post<{ post: Post }>('/api/posts', { content });
       onPostCreated(response.data.post);
       setContent('');
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to create post');
+      if (axios.isAxiosError(err)) {
+        setError(err.response?.data?.error || 'Failed to create post');
+      } else {
+        setError('Failed to create post');
+      }
     } finally {
       setLoading(false);
     }

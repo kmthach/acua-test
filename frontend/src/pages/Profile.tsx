@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
+import axios from 'axios';
 
 const Profile = () => {
   const { user, updateProfile } = useAuth();
@@ -13,7 +14,7 @@ const Profile = () => {
     }
   }, [user]);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage('');
@@ -22,11 +23,19 @@ const Profile = () => {
       await updateProfile(fullName);
       setMessage('Profile updated successfully!');
     } catch (err) {
-      setMessage(err.response?.data?.error || 'Update failed');
+      if (axios.isAxiosError(err)) {
+        setMessage(err.response?.data?.error || 'Update failed');
+      } else {
+        setMessage('Update failed');
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
@@ -50,7 +59,7 @@ const Profile = () => {
             </label>
             <input
               type="text"
-              value={user?.username || ''}
+              value={user.username || ''}
               disabled
               className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600"
             />
@@ -76,7 +85,7 @@ const Profile = () => {
             </label>
             <input
               type="text"
-              value={user?.role || ''}
+              value={user.role || ''}
               disabled
               className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600"
             />

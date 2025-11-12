@@ -1,9 +1,10 @@
 import pkg from "pg";
 const { Pool } = pkg;
+import type { Pool as PoolType, QueryResult } from "pg";
 
-let pool;
+let pool: PoolType | null = null;
 
-export function getDb() {
+export function getDb(): PoolType {
   if (!pool) {
     // Parse connection string or use individual env vars
     const connectionString =
@@ -25,14 +26,14 @@ export function getDb() {
       console.log("Connected to PostgreSQL database");
     });
 
-    pool.on("error", (err) => {
+    pool.on("error", (err: Error) => {
       console.error("Unexpected error on idle client", err);
     });
   }
   return pool;
 }
 
-export async function initDatabase() {
+export async function initDatabase(): Promise<void> {
   const database = getDb();
 
   // Create users table
@@ -126,12 +127,17 @@ export async function initDatabase() {
   );
 }
 
+interface ConvertedQuery {
+  sql: string;
+  params: unknown[];
+}
+
 // Convert MySQL-style ? placeholders to PostgreSQL $1, $2, etc.
-function convertQuery(sql, params = []) {
+function convertQuery(sql: string, params: unknown[] = []): ConvertedQuery {
   let paramIndex = 1;
-  const convertedParams = [];
-  const paramPositions = [];
-  let match;
+  const convertedParams: unknown[] = [];
+  const paramPositions: number[] = [];
+  let match: RegExpExecArray | null;
 
   // Find all ? positions first
   const regex = /\?/g;
@@ -180,17 +186,23 @@ function convertQuery(sql, params = []) {
   };
 }
 
-export async function query(sql, params = []) {
+export async function query<T = unknown>(sql: string, params: unknown[] = []): Promise<T[]> {
   const database = getDb();
   const { sql: convertedSql, params: convertedParams } = convertQuery(
     sql,
     params
   );
-  const result = await database.query(convertedSql, convertedParams);
+  const result: QueryResult<T> = await database.query(convertedSql, convertedParams);
   return result.rows;
 }
 
-export async function run(sql, params = []) {
+interface RunResult {
+  id: number | null;
+  changes: number;
+  insertId: number | null;
+}
+
+export async function run(sql: string, params: unknown[] = []): Promise<RunResult> {
   const database = getDb();
   const { sql: convertedSql, params: convertedParams } = convertQuery(
     sql,
@@ -199,18 +211,19 @@ export async function run(sql, params = []) {
   const result = await database.query(convertedSql, convertedParams);
 
   // For INSERT queries, get the last inserted ID from RETURNING clause
-  let insertId = null;
+  let insertId: number | null = null;
   if (sql.trim().toUpperCase().startsWith("INSERT")) {
     // If RETURNING clause is used, get ID from result
     if (result.rows && result.rows.length > 0) {
-      insertId = result.rows[0].id || result.rows[0]?.id || null;
+      insertId = (result.rows[0] as { id?: number })?.id || null;
     } else {
       // Fallback to LASTVAL() if no RETURNING clause
       try {
-        const idResult = await database.query("SELECT LASTVAL() as id");
+        const idResult = await database.query<{ id: number }>("SELECT LASTVAL() as id");
         insertId = idResult.rows[0]?.id || null;
       } catch (err) {
-        console.warn("Could not get last insert ID:", err.message);
+        const error = err as Error;
+        console.warn("Could not get last insert ID:", error.message);
       }
     }
   }
@@ -222,12 +235,13 @@ export async function run(sql, params = []) {
   };
 }
 
-export async function get(sql, params = []) {
+export async function get<T = unknown>(sql: string, params: unknown[] = []): Promise<T | null> {
   const database = getDb();
   const { sql: convertedSql, params: convertedParams } = convertQuery(
     sql,
     params
   );
-  const result = await database.query(convertedSql, convertedParams);
+  const result = await database.query<T>(convertedSql, convertedParams);
   return result.rows[0] || null;
 }
+

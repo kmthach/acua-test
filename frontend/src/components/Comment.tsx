@@ -1,13 +1,23 @@
 import { useState } from 'react';
 import axios from 'axios';
+import { Comment as CommentType } from '../types';
+import { User } from '../context/AuthContext';
 
-const Comment = ({ comment, currentUser, isAdmin, onCommentUpdated, onCommentDeleted }) => {
+interface CommentProps {
+  comment: CommentType;
+  currentUser: User;
+  isAdmin: boolean;
+  onCommentUpdated: (comment: CommentType) => void;
+  onCommentDeleted: (commentId: number) => void;
+}
+
+const Comment = ({ comment, currentUser, isAdmin, onCommentUpdated, onCommentDeleted }: CommentProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const getInitials = (fullName) => {
+  const getInitials = (fullName?: string): string => {
     if (!fullName) return 'U';
     return fullName
       .split(' ')
@@ -25,13 +35,17 @@ const Comment = ({ comment, currentUser, isAdmin, onCommentUpdated, onCommentDel
 
     setLoading(true);
     try {
-      const response = await axios.put(`/api/comments/${comment.id}`, {
+      const response = await axios.put<{ comment: CommentType }>(`/api/comments/${comment.id}`, {
         content: editContent
       });
       onCommentUpdated(response.data.comment);
       setIsEditing(false);
     } catch (error) {
-      alert(error.response?.data?.error || 'Failed to update comment');
+      if (axios.isAxiosError(error)) {
+        alert(error.response?.data?.error || 'Failed to update comment');
+      } else {
+        alert('Failed to update comment');
+      }
     } finally {
       setLoading(false);
     }
@@ -47,12 +61,16 @@ const Comment = ({ comment, currentUser, isAdmin, onCommentUpdated, onCommentDel
       await axios.delete(`/api/comments/${comment.id}`);
       onCommentDeleted(comment.id);
     } catch (error) {
-      alert(error.response?.data?.error || 'Failed to delete comment');
+      if (axios.isAxiosError(error)) {
+        alert(error.response?.data?.error || 'Failed to delete comment');
+      } else {
+        alert('Failed to delete comment');
+      }
       setDeleting(false);
     }
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleString();
   };
 

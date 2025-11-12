@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Express } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { fileURLToPath } from "url";
@@ -14,7 +14,7 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const app = express();
+const app: Express = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
@@ -22,7 +22,7 @@ app.use(cors());
 app.use(express.json());
 
 // Initialize database
-initDatabase().catch((err) => {
+initDatabase().catch((err: Error) => {
   console.error("Error initializing database:", err);
   process.exit(1);
 });
@@ -41,3 +41,4 @@ app.get("/api/health", (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+

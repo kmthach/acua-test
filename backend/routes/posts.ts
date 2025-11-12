@@ -1,21 +1,33 @@
-import express from "express";
+import express, { Request, Response } from "express";
 import { body, validationResult } from "express-validator";
-import { authenticate, isAdmin } from "../middleware/auth.js";
+import { authenticate, AuthRequest } from "../middleware/auth.js";
 import { query, run, get } from "../db/database.js";
 
 const router = express.Router();
 
-// Get all posts (timeline) - sorted by date desc, exclude deleted for non-admins
-router.get("/", authenticate, async (req, res) => {
-  try {
-    const isAdminUser = req.user.role === "admin";
+interface Post {
+  id: number;
+  user_id: number;
+  content: string;
+  deleted: boolean;
+  edited: boolean;
+  edited_by_admin: boolean;
+  created_at: Date;
+  updated_at: Date;
+  username?: string;
+  full_name?: string;
+  comment_count?: number;
+}
 
-    let sql = `
-      SELECT 
-        p.*,
-        u.username,
-        u.full_name,
-        COUNT(DISTINCT c.id) as comment_count
+// Get all posts (timeline) - sorted by date desc, exclude deleted for non-admins
+router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const isAdminUser = req.user?.role === "admin";
+    const limit = parseInt(req.query.limit as string) || 10;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    // Build base query for posts
+    let baseSql = `
       FROM posts p
       INNER JOIN users u ON p.user_id = u.id
       LEFT JOIN comments c ON p.id = c.post_id
@@ -23,18 +35,43 @@ router.get("/", authenticate, async (req, res) => {
 
     // For non-admins, filter out deleted comments in the JOIN
     if (!isAdminUser) {
-      sql = sql.replace(
+      baseSql = baseSql.replace(
         "LEFT JOIN comments c ON p.id = c.post_id",
         "LEFT JOIN comments c ON p.id = c.post_id AND c.deleted = FALSE"
       );
-      sql += " WHERE p.deleted = FALSE";
+      baseSql += " WHERE p.deleted = FALSE";
     }
 
-    sql += ` GROUP BY p.id, p.user_id, p.content, p.deleted, p.edited, p.edited_by_admin, p.created_at, p.updated_at, u.username, u.full_name ORDER BY p.created_at DESC`;
+    // Get total count for pagination
+    const countSql = `SELECT COUNT(DISTINCT p.id) as total ${baseSql}`;
+    const countResult = await query<{ total: string | number }>(countSql);
+    const total = parseInt(String(countResult[0]?.total || 0), 10);
 
-    const posts = await query(sql);
+    // Get paginated posts
+    const postsSql = `
+      SELECT 
+        p.*,
+        u.username,
+        u.full_name,
+        COUNT(DISTINCT c.id) as comment_count
+      ${baseSql}
+      GROUP BY p.id, p.user_id, p.content, p.deleted, p.edited, p.edited_by_admin, p.created_at, p.updated_at, u.username, u.full_name 
+      ORDER BY p.created_at DESC
+      LIMIT ? OFFSET ?
+    `;
 
-    res.json({ posts });
+    const posts = await query<Post>(postsSql, [limit, offset]);
+    const hasMore = offset + posts.length < total;
+
+    res.json({
+      posts,
+      pagination: {
+        limit,
+        offset,
+        total,
+        hasMore,
+      },
+    });
   } catch (error) {
     console.error("Get posts error:", error);
     res.status(500).json({ error: "Server error" });
@@ -42,22 +79,20 @@ router.get("/", authenticate, async (req, res) => {
 });
 
 // Search posts
-router.get("/search", authenticate, async (req, res) => {
+router.get("/search", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { q } = req.query;
     if (!q) {
       return res.status(400).json({ error: "Search query is required" });
     }
 
-    const isAdminUser = req.user.role === "admin";
+    const isAdminUser = req.user?.role === "admin";
+    const limit = parseInt(req.query.limit as string) || 10;
+    const offset = parseInt(req.query.offset as string) || 0;
     const searchTerm = `%${q}%`;
 
-    let sql = `
-      SELECT 
-        p.*,
-        u.username,
-        u.full_name,
-        COUNT(DISTINCT c.id) as comment_count
+    // Build base query for search
+    let baseSql = `
       FROM posts p
       INNER JOIN users u ON p.user_id = u.id
       LEFT JOIN comments c ON p.id = c.post_id
@@ -66,18 +101,51 @@ router.get("/search", authenticate, async (req, res) => {
 
     // For non-admins, filter out deleted comments in the JOIN
     if (!isAdminUser) {
-      sql = sql.replace(
+      baseSql = baseSql.replace(
         "LEFT JOIN comments c ON p.id = c.post_id",
         "LEFT JOIN comments c ON p.id = c.post_id AND c.deleted = FALSE"
       );
-      sql += " AND p.deleted = FALSE";
+      baseSql += " AND p.deleted = FALSE";
     }
 
-    sql += ` GROUP BY p.id, p.user_id, p.content, p.deleted, p.edited, p.edited_by_admin, p.created_at, p.updated_at, u.username, u.full_name ORDER BY p.created_at DESC`;
+    // Get total count for pagination
+    const countSql = `SELECT COUNT(DISTINCT p.id) as total ${baseSql}`;
+    const countResult = await query<{ total: string | number }>(countSql, [
+      searchTerm,
+      searchTerm,
+    ]);
+    const total = parseInt(String(countResult[0]?.total || 0), 10);
 
-    const posts = await query(sql, [searchTerm, searchTerm]);
+    // Get paginated search results
+    const postsSql = `
+      SELECT 
+        p.*,
+        u.username,
+        u.full_name,
+        COUNT(DISTINCT c.id) as comment_count
+      ${baseSql}
+      GROUP BY p.id, p.user_id, p.content, p.deleted, p.edited, p.edited_by_admin, p.created_at, p.updated_at, u.username, u.full_name 
+      ORDER BY p.created_at DESC
+      LIMIT ? OFFSET ?
+    `;
 
-    res.json({ posts });
+    const posts = await query<Post>(postsSql, [
+      searchTerm,
+      searchTerm,
+      limit,
+      offset,
+    ]);
+    const hasMore = offset + posts.length < total;
+
+    res.json({
+      posts,
+      pagination: {
+        limit,
+        offset,
+        total,
+        hasMore,
+      },
+    });
   } catch (error) {
     console.error("Search posts error:", error);
     res.status(500).json({ error: "Server error" });
@@ -89,7 +157,7 @@ router.post(
   "/",
   authenticate,
   [body("content").trim().notEmpty().withMessage("Content is required")],
-  async (req, res) => {
+  async (req: AuthRequest, res: Response) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -99,17 +167,17 @@ router.post(
       const { content } = req.body;
       const result = await run(
         "INSERT INTO posts (user_id, content) VALUES (?, ?) RETURNING id",
-        [req.user.id, content]
+        [req.user!.id, content]
       );
 
-      const post = await get(
+      const post = await get<Post>(
         `
       SELECT p.*, u.username, u.full_name 
       FROM posts p 
       INNER JOIN users u ON p.user_id = u.id 
       WHERE p.id = ?
     `,
-        [result.id]
+        [result.id!]
       );
 
       res.status(201).json({ post });
@@ -125,7 +193,7 @@ router.put(
   "/:id",
   authenticate,
   [body("content").trim().notEmpty().withMessage("Content is required")],
-  async (req, res) => {
+  async (req: AuthRequest, res: Response) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -136,14 +204,14 @@ router.put(
       const { content } = req.body;
 
       // Check if post exists
-      const post = await get("SELECT * FROM posts WHERE id = ?", [id]);
+      const post = await get<Post>("SELECT * FROM posts WHERE id = ?", [id]);
       if (!post) {
         return res.status(404).json({ error: "Post not found" });
       }
 
       // Check permissions
-      const isOwner = post.user_id === req.user.id;
-      const isAdminUser = req.user.role === "admin";
+      const isOwner = post.user_id === req.user!.id;
+      const isAdminUser = req.user!.role === "admin";
 
       if (!isOwner && !isAdminUser) {
         return res.status(403).json({ error: "Permission denied" });
@@ -156,7 +224,7 @@ router.put(
         [content, editedByAdmin, id]
       );
 
-      const updatedPost = await get(
+      const updatedPost = await get<Post>(
         `
       SELECT p.*, u.username, u.full_name 
       FROM posts p 
@@ -175,19 +243,19 @@ router.put(
 );
 
 // Delete post
-router.delete("/:id", authenticate, async (req, res) => {
+router.delete("/:id", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
     // Check if post exists
-    const post = await get("SELECT * FROM posts WHERE id = ?", [id]);
+    const post = await get<Post>("SELECT * FROM posts WHERE id = ?", [id]);
     if (!post) {
       return res.status(404).json({ error: "Post not found" });
     }
 
     // Check permissions
-    const isOwner = post.user_id === req.user.id;
-    const isAdminUser = req.user.role === "admin";
+    const isOwner = post.user_id === req.user!.id;
+    const isAdminUser = req.user!.role === "admin";
 
     if (!isOwner && !isAdminUser) {
       return res.status(403).json({ error: "Permission denied" });
@@ -204,10 +272,10 @@ router.delete("/:id", authenticate, async (req, res) => {
 });
 
 // Get single post
-router.get("/:id", authenticate, async (req, res) => {
+router.get("/:id", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const isAdminUser = req.user.role === "admin";
+    const isAdminUser = req.user?.role === "admin";
 
     let sql = `
       SELECT p.*, u.username, u.full_name 
@@ -220,7 +288,7 @@ router.get("/:id", authenticate, async (req, res) => {
       sql += " AND p.deleted = 0";
     }
 
-    const post = await get(sql, [id]);
+    const post = await get<Post>(sql, [id]);
 
     if (!post) {
       return res.status(404).json({ error: "Post not found" });

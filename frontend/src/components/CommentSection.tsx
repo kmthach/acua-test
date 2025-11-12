@@ -1,9 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import axios from 'axios';
 import Comment from './Comment';
+import { Comment as CommentType } from '../types';
+import { User } from '../context/AuthContext';
 
-const CommentSection = ({ postId, currentUser, isAdmin }) => {
-  const [comments, setComments] = useState([]);
+interface CommentSectionProps {
+  postId: number;
+  currentUser: User;
+  isAdmin: boolean;
+}
+
+const CommentSection = ({ postId, currentUser, isAdmin }: CommentSectionProps) => {
+  const [comments, setComments] = useState<CommentType[]>([]);
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
@@ -15,7 +23,7 @@ const CommentSection = ({ postId, currentUser, isAdmin }) => {
   const fetchComments = async () => {
     try {
       setFetching(true);
-      const response = await axios.get(`/api/comments/post/${postId}`);
+      const response = await axios.get<{ comments: CommentType[] }>(`/api/comments/post/${postId}`);
       setComments(response.data.comments);
     } catch (error) {
       console.error('Error fetching comments:', error);
@@ -24,30 +32,34 @@ const CommentSection = ({ postId, currentUser, isAdmin }) => {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!content.trim()) return;
 
     setLoading(true);
     try {
-      const response = await axios.post('/api/comments', {
+      const response = await axios.post<{ comment: CommentType }>('/api/comments', {
         post_id: postId,
         content
       });
       setComments([response.data.comment, ...comments]);
       setContent('');
     } catch (error) {
-      alert(error.response?.data?.error || 'Failed to create comment');
+      if (axios.isAxiosError(error)) {
+        alert(error.response?.data?.error || 'Failed to create comment');
+      } else {
+        alert('Failed to create comment');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCommentUpdated = (updatedComment) => {
+  const handleCommentUpdated = (updatedComment: CommentType) => {
     setComments(comments.map(c => c.id === updatedComment.id ? updatedComment : c));
   };
 
-  const handleCommentDeleted = (commentId) => {
+  const handleCommentDeleted = (commentId: number) => {
     if (isAdmin) {
       fetchComments();
     } else {
