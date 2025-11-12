@@ -29,13 +29,13 @@ A fullstack social media application built with React, Node.js, and SQLite (Post
 - **Frontend**: React, Tailwind CSS, React Router, Axios
 - **Backend**: Node.js, Express, JWT, bcryptjs
 - **Database**: PostgreSQL (pg)
+- **Runtime**: Bun
 
 ## Setup Instructions
 
 ### Prerequisites
 
-- Node.js (v18 or higher)
-- npm or yarn
+- Bun (latest version)
 
 ### Backend Setup
 
@@ -48,7 +48,7 @@ cd backend
 2. Install dependencies:
 
 ```bash
-npm install
+bun install
 ```
 
 3. Create a `.env` file in the backend directory with your database credentials:
@@ -62,9 +62,9 @@ DATABASE_URL=postgresql://postgres:fV0LFPR7mKTroJ9m@db.rxwcfhspknhkiykojsme.supa
 4. Start the backend server:
 
 ```bash
-npm start
+bun run start
 # or for development with auto-reload:
-npm run dev
+bun run dev
 ```
 
 The backend will run on `http://localhost:3001`
@@ -80,13 +80,13 @@ cd frontend
 2. Install dependencies:
 
 ```bash
-npm install
+bun install
 ```
 
 3. Start the development server:
 
 ```bash
-npm run dev
+bun run dev
 ```
 
 The frontend will run on `http://localhost:3000`
